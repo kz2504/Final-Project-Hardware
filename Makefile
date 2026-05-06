@@ -48,7 +48,7 @@ TARFILES = Makefile \
 	$(SRF) \
 	ip/intr_capturer/intr_capturer.v \
 	ip/intr_capturer/intr_capturer_hw.tcl \
-	thresholding.sv
+	imgproc.sv
 
 TARFILE = lab3-hw.tar.gz
 

@@ -7,7 +7,7 @@
  *   2      DATA      R       Four pixels packed as {p3, p2, p1, p0}.
  */
 
-module thresholding(
+module imgproc(
    input  logic        clk,
    input  logic        reset,
 
@@ -46,14 +46,17 @@ module thresholding(
       STATE_DONE
    } capture_state_t;
 
-   logic [31:0] frame_ram [0:FRAME_WORDS-1];
-
    logic [31:0] frame_index;
-   logic [31:0] frame_rd_data;
    logic        frame_index_valid;
    logic        write_index_valid;
    logic [FRAME_WORD_BITS-1:0] frame_rd_addr;
    logic [FRAME_WORD_BITS-1:0] write_index_addr;
+   logic [FRAME_WORD_BITS-1:0] frame_ram_rd_addr;
+   logic [31:0] frame_ram_rd_data;
+   logic [31:0] frame_ram_wr_data;
+   logic        frame_ram_wren;
+
+   (* ramstyle = "M10K" *) logic [31:0] frame_ram [0:FRAME_WORDS-1];
 
    logic        clk25;
    logic        done_meta;
@@ -75,12 +78,17 @@ module thresholding(
    assign frame_rd_addr = frame_index_valid ? frame_index[FRAME_WORD_BITS-1:0] : '0;
    assign write_index_valid = writedata < FRAME_WORDS;
    assign write_index_addr = write_index_valid ? writedata[FRAME_WORD_BITS-1:0] : '0;
+   assign frame_ram_rd_addr =
+      (chipselect && write && address == REG_INDEX) ? write_index_addr : frame_rd_addr;
+   assign frame_ram_wr_data = { data, pixel_pack_word };
+   assign frame_ram_wren =
+      capture_state == STATE_CAPTURE && !vsync && href &&
+      !yuv_byte_phase[0] && pixel_pack_phase == 2'd3;
 
    always_ff @(posedge clk or posedge reset) begin
       if (reset) begin
          clk25            <= 1'b0;
          frame_index      <= 32'd0;
-         frame_rd_data    <= 32'd0;
          done_meta        <= 1'b0;
          done_clk         <= 1'b0;
          clear_req_toggle <= 1'b0;
@@ -88,7 +96,6 @@ module thresholding(
          clk25         <= ~clk25;
          done_meta     <= done_pclk;
          done_clk      <= done_meta;
-         frame_rd_data <= frame_ram[frame_rd_addr];
 
          if (chipselect && write) begin
             unique case (address)
@@ -99,8 +106,7 @@ module thresholding(
                end
 
                REG_INDEX: begin
-                  frame_index   <= writedata;
-                  frame_rd_data <= frame_ram[write_index_addr];
+                  frame_index <= writedata;
                end
 
                default: begin
@@ -108,6 +114,10 @@ module thresholding(
             endcase
          end
       end
+   end
+
+   always_ff @(posedge clk) begin
+      frame_ram_rd_data <= frame_ram[frame_ram_rd_addr];
    end
 
    always_ff @(posedge pclk or posedge reset) begin
@@ -158,7 +168,6 @@ module thresholding(
                            2'd1: pixel_pack_word[15:8]  <= data;
                            2'd2: pixel_pack_word[23:16] <= data;
                            default: begin
-                              frame_ram[frame_wr_addr] <= { data, pixel_pack_word };
                               frame_wr_addr <= frame_wr_addr + 1'b1;
                            end
                         endcase
@@ -187,6 +196,12 @@ module thresholding(
       end
    end
 
+   always_ff @(posedge pclk) begin
+      if (frame_ram_wren) begin
+         frame_ram[frame_wr_addr] <= frame_ram_wr_data;
+      end
+   end
+
    assign clear_req_seen = clear_req_sync[2] ^ clear_req_sync[1];
    assign done_pclk = capture_state == STATE_DONE;
 
@@ -194,7 +209,7 @@ module thresholding(
       unique case (address)
          REG_CONTROL: readdata = { 31'd0, done_clk };
          REG_INDEX:   readdata = frame_index;
-         REG_DATA:    readdata = frame_index_valid ? frame_rd_data : 32'd0;
+         REG_DATA:    readdata = frame_index_valid ? frame_ram_rd_data : 32'd0;
          default:     readdata = 32'd0;
       endcase
    end

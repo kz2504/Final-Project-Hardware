@@ -12,7 +12,7 @@ set project "soc_system"
 # Top-level SystemVerilog file should be <project>_top.sv, with Verilog module
 # <project>_top in it
 
-set systemVerilogSource [list "${project}_top.sv" "thresholding.sv"]
+set systemVerilogSource [list "${project}_top.sv" "imgproc.sv"]
 set qip "${project}/synthesis/${project}.qip"
 
 project_new $project -overwrite
