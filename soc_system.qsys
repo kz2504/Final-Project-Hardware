@@ -611,7 +611,7 @@
    start="hps_0.h2f_lw_axi_master"
    end="gpio1_upper.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00000000" />
+  <parameter name="baseAddress" value="0x00000020" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
