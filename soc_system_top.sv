@@ -180,6 +180,10 @@ module soc_system_top(
 
    logic [31:0] thresholding_readdata;
    logic       gpio1_clk;
+   logic [7:0] ov7670_data;
+   logic       ov7670_hs;
+   logic       ov7670_vs;
+   logic       ov7670_pclk;
 
    soc_system soc_system0(
      .clk_clk                      ( CLOCK_50 ),
@@ -292,6 +296,11 @@ module soc_system_top(
    assign GPIO_1[26] = gpio1_clk;
    assign GPIO_1[27] = gpio1_clk;
 
+   assign ov7670_data = GPIO_1[7:0];
+   assign ov7670_hs   = GPIO_1[8];
+   assign ov7670_vs   = GPIO_1[9];
+   assign ov7670_pclk = GPIO_1[10];
+
    assign HEX0 = { 7{ SW[1] } };
    assign HEX1 = { 7{ SW[2] } };
    assign HEX2 = { 7{ SW[3] } };
@@ -316,10 +325,10 @@ module soc_system_top(
       .chipselect   ( 1'b0 ),
       .address      ( 2'h0 ),
       .readdata     ( thresholding_readdata ),
-      .camera_pclk  ( TD_CLK27 ),
-      .camera_href  ( TD_HS ),
-      .camera_vsync ( TD_VS ),
-      .camera_data  ( TD_DATA ),
+      .camera_pclk  ( ov7670_pclk ),
+      .camera_href  ( ov7670_hs ),
+      .camera_vsync ( ov7670_vs ),
+      .camera_data  ( ov7670_data ),
       .LEDR         ( LEDR ),
       .GPIO1_CLK    ( gpio1_clk )
    );
