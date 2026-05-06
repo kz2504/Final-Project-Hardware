@@ -178,7 +178,7 @@ module soc_system_top(
  input         TD_VS
 );
 
-   logic [7:0] thresholding_readdata;
+   logic [31:0] thresholding_readdata;
    logic       gpio1_clk;
 
    soc_system soc_system0(
@@ -309,15 +309,19 @@ module soc_system_top(
    assign TD_RESET_N = SW[0];
 
    thresholding thresholding0(
-      .clk        ( CLOCK_50 ),
-      .reset      ( ~KEY[0] ),
-      .writedata  ( 8'h00 ),
-      .write      ( 1'b0 ),
-      .chipselect ( 1'b0 ),
-      .address    ( 3'h0 ),
-      .readdata   ( thresholding_readdata ),
-      .LEDR       ( LEDR ),
-      .GPIO1_CLK   ( gpio1_clk )
+      .clk          ( CLOCK_50 ),
+      .reset        ( ~KEY[0] ),
+      .writedata    ( 32'h00000000 ),
+      .write        ( 1'b0 ),
+      .chipselect   ( 1'b0 ),
+      .address      ( 2'h0 ),
+      .readdata     ( thresholding_readdata ),
+      .camera_pclk  ( TD_CLK27 ),
+      .camera_href  ( TD_HS ),
+      .camera_vsync ( TD_VS ),
+      .camera_data  ( TD_DATA ),
+      .LEDR         ( LEDR ),
+      .GPIO1_CLK    ( gpio1_clk )
    );
 
                                                                   
