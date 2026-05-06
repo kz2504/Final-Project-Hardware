@@ -17,7 +17,7 @@ module thresholding(
 
    output logic [7:0] readdata,
    output logic [9:0] LEDR,
-   output logic       GPIO1_31
+   output logic       GPIO1_CLK
 );
 
    logic [7:0] control;
@@ -40,7 +40,7 @@ module thresholding(
    end
 
    assign readdata = (address == 3'h0) ? control : 8'h00;
-   assign LEDR = 10'h3ff;
-   assign GPIO1_31 = clk25;
+   assign LEDR = reset ? 10'h000 : 10'h3ff;
+   assign GPIO1_CLK = clk25;
 
 endmodule

@@ -179,11 +179,13 @@ module soc_system_top(
 );
 
    logic [7:0] thresholding_readdata;
-   logic       gpio1_31_clk;
+   logic       gpio1_clk;
 
    soc_system soc_system0(
      .clk_clk                      ( CLOCK_50 ),
      .reset_reset_n                ( KEY[0] ),
+
+     .gpio1_upper_export           ( GPIO_1[35:28] ),
                           
      .hps_ddr3_mem_a               ( HPS_DDR3_ADDR ),
      .hps_ddr3_mem_ba              ( HPS_DDR3_BA ),
@@ -285,10 +287,9 @@ module soc_system_top(
    assign FPGA_I2C_SCLK = SW[0];
    assign FPGA_I2C_SDAT = SW[1] ? SW[0] : 1'bZ;
 
-   assign GPIO_0 = SW[1] ? { 36{ SW[0] } } : { 36{ 1'bZ } };
-   assign GPIO_1[30:0] = {31{1'bZ}};
-   assign GPIO_1[31] = gpio1_31_clk;
-   assign GPIO_1[35:32] = {4{1'bZ}};
+   assign GPIO_1[25:0] = {26{1'bZ}};
+   assign GPIO_1[26] = gpio1_clk;
+   assign GPIO_1[27] = gpio1_clk;
 
    assign HEX0 = { 7{ SW[1] } };
    assign HEX1 = { 7{ SW[2] } };
@@ -315,7 +316,7 @@ module soc_system_top(
       .address    ( 3'h0 ),
       .readdata   ( thresholding_readdata ),
       .LEDR       ( LEDR ),
-      .GPIO1_31   ( gpio1_31_clk )
+      .GPIO1_CLK   ( gpio1_clk )
    );
 
                                                                   
