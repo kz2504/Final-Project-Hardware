@@ -18,13 +18,13 @@ module thresholding(
 
    output logic [31:0] readdata,
 
-   input  logic        camera_pclk,
-   input  logic        camera_href,
-   input  logic        camera_vsync,
-   input  logic [7:0]  camera_data,
+   input  logic        pclk,
+   input  logic        href,
+   input  logic        vsync,
+   input  logic [7:0]  data,
 
-   output logic [9:0]  LEDR,
-   output logic        GPIO1_CLK
+   output logic [9:0]  leds,
+   output logic        xclk
 );
 
    localparam int FRAME_WIDTH      = 320;
@@ -110,7 +110,7 @@ module thresholding(
       end
    end
 
-   always_ff @(posedge camera_pclk or posedge reset) begin
+   always_ff @(posedge pclk or posedge reset) begin
       if (reset) begin
          clear_req_sync   <= 3'b000;
          capture_state    <= STATE_WAIT_FRAME;
@@ -122,7 +122,7 @@ module thresholding(
          captured_pixels  <= '0;
       end else begin
          clear_req_sync <= { clear_req_sync[1:0], clear_req_toggle };
-         vsync_d        <= camera_vsync;
+         vsync_d        <= vsync;
 
          if (clear_req_seen) begin
             capture_state    <= STATE_WAIT_FRAME;
@@ -136,7 +136,7 @@ module thresholding(
                STATE_WAIT_FRAME: begin
                   yuv_byte_phase <= 2'd0;
 
-                  if (vsync_d && !camera_vsync) begin
+                  if (vsync_d && !vsync) begin
                      capture_state    <= STATE_CAPTURE;
                      pixel_pack_phase <= 2'd0;
                      pixel_pack_word  <= 24'd0;
@@ -146,19 +146,19 @@ module thresholding(
                end
 
                STATE_CAPTURE: begin
-                  if (camera_vsync) begin
+                  if (vsync) begin
                      capture_state  <= STATE_WAIT_FRAME;
                      yuv_byte_phase <= 2'd0;
-                  end else if (camera_href) begin
+                  end else if (href) begin
                      yuv_byte_phase <= yuv_byte_phase + 2'd1;
 
                      if (!yuv_byte_phase[0]) begin
                         unique case (pixel_pack_phase)
-                           2'd0: pixel_pack_word[7:0]   <= camera_data;
-                           2'd1: pixel_pack_word[15:8]  <= camera_data;
-                           2'd2: pixel_pack_word[23:16] <= camera_data;
+                           2'd0: pixel_pack_word[7:0]   <= data;
+                           2'd1: pixel_pack_word[15:8]  <= data;
+                           2'd2: pixel_pack_word[23:16] <= data;
                            default: begin
-                              frame_ram[frame_wr_addr] <= { camera_data, pixel_pack_word };
+                              frame_ram[frame_wr_addr] <= { data, pixel_pack_word };
                               frame_wr_addr <= frame_wr_addr + 1'b1;
                            end
                         endcase
@@ -199,7 +199,7 @@ module thresholding(
       endcase
    end
 
-   assign LEDR      = { 8'd0, capture_state == STATE_CAPTURE, done_clk };
-   assign GPIO1_CLK = clk25;
+   assign leds = { 8'd0, capture_state == STATE_CAPTURE, done_clk };
+   assign xclk = clk25;
 
 endmodule

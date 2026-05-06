@@ -178,13 +178,6 @@ module soc_system_top(
  input         TD_VS
 );
 
-   logic [31:0] thresholding_readdata;
-   logic       gpio1_clk;
-   logic [7:0] ov7670_data;
-   logic       ov7670_hs;
-   logic       ov7670_vs;
-   logic       ov7670_pclk;
-
    soc_system soc_system0(
      .clk_clk                      ( CLOCK_50 ),
      .reset_reset_n                ( KEY[0] ),
@@ -293,13 +286,9 @@ module soc_system_top(
    assign FPGA_I2C_SDAT = SW[1] ? SW[0] : 1'bZ;
 
    assign GPIO_1[21:0] = {22{1'bZ}};
-   assign GPIO_1[26] = gpio1_clk;
-   assign GPIO_1[27] = gpio1_clk;
-
-   assign ov7670_data = GPIO_1[7:0];
-   assign ov7670_hs   = GPIO_1[8];
-   assign ov7670_vs   = GPIO_1[9];
-   assign ov7670_pclk = GPIO_1[10];
+   assign GPIO_1[26] = 1'bZ;
+   assign GPIO_1[27] = 1'bZ;
+   assign LEDR = 10'h000;
 
    assign HEX0 = { 7{ SW[1] } };
    assign HEX1 = { 7{ SW[2] } };
@@ -316,22 +305,6 @@ module soc_system_top(
    assign PS2_DAT2 = SW[1] ? SW[0] : 1'bZ;
 
    assign TD_RESET_N = SW[0];
-
-   thresholding thresholding0(
-      .clk          ( CLOCK_50 ),
-      .reset        ( ~KEY[0] ),
-      .writedata    ( 32'h00000000 ),
-      .write        ( 1'b0 ),
-      .chipselect   ( 1'b0 ),
-      .address      ( 2'h0 ),
-      .readdata     ( thresholding_readdata ),
-      .camera_pclk  ( ov7670_pclk ),
-      .camera_href  ( ov7670_hs ),
-      .camera_vsync ( ov7670_vs ),
-      .camera_data  ( ov7670_data ),
-      .LEDR         ( LEDR ),
-      .GPIO1_CLK    ( gpio1_clk )
-   );
 
                                                                   
 endmodule
