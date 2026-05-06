@@ -185,6 +185,7 @@ module soc_system_top(
      .clk_clk                      ( CLOCK_50 ),
      .reset_reset_n                ( KEY[0] ),
 
+     .gpio1_i2c_export             ( GPIO_1[25:22] ),
      .gpio1_upper_export           ( GPIO_1[35:28] ),
                           
      .hps_ddr3_mem_a               ( HPS_DDR3_ADDR ),
@@ -287,7 +288,7 @@ module soc_system_top(
    assign FPGA_I2C_SCLK = SW[0];
    assign FPGA_I2C_SDAT = SW[1] ? SW[0] : 1'bZ;
 
-   assign GPIO_1[25:0] = {26{1'bZ}};
+   assign GPIO_1[21:0] = {22{1'bZ}};
    assign GPIO_1[26] = gpio1_clk;
    assign GPIO_1[27] = gpio1_clk;
 

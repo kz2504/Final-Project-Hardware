@@ -48,6 +48,11 @@
  <instanceScript></instanceScript>
  <interface name="clk" internal="clk_0.clk_in" type="clock" dir="end" />
  <interface
+   name="gpio1_i2c"
+   internal="gpio1_i2c.external_connection"
+   type="conduit"
+   dir="end" />
+ <interface
    name="gpio1_upper"
    internal="gpio1_upper.external_connection"
    type="conduit"
@@ -591,6 +596,20 @@
   <parameter name="usb_mp_clk_div" value="0" />
   <parameter name="use_default_mpu_clk" value="true" />
  </module>
+ <module name="gpio1_i2c" kind="altera_avalon_pio" version="21.1" enabled="1">
+  <parameter name="bitClearingEdgeCapReg" value="false" />
+  <parameter name="bitModifyingOutReg" value="false" />
+  <parameter name="captureEdge" value="false" />
+  <parameter name="clockRate" value="50000000" />
+  <parameter name="direction" value="Bidir" />
+  <parameter name="edgeType" value="RISING" />
+  <parameter name="generateIRQ" value="false" />
+  <parameter name="irqType" value="LEVEL" />
+  <parameter name="resetValue" value="0" />
+  <parameter name="simDoTestBenchWiring" value="false" />
+  <parameter name="simDrivenValue" value="0" />
+  <parameter name="width" value="4" />
+ </module>
  <module name="gpio1_upper" kind="altera_avalon_pio" version="21.1" enabled="1">
   <parameter name="bitClearingEdgeCapReg" value="false" />
   <parameter name="bitModifyingOutReg" value="false" />
@@ -605,6 +624,15 @@
   <parameter name="simDrivenValue" value="0" />
   <parameter name="width" value="8" />
  </module>
+ <connection
+   kind="avalon"
+   version="21.1"
+   start="hps_0.h2f_lw_axi_master"
+   end="gpio1_i2c.s1">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00000040" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
  <connection
    kind="avalon"
    version="21.1"
@@ -629,7 +657,9 @@
    version="21.1"
    start="clk_0.clk"
    end="hps_0.h2f_lw_axi_clock" />
+ <connection kind="clock" version="21.1" start="clk_0.clk" end="gpio1_i2c.clk" />
  <connection kind="clock" version="21.1" start="clk_0.clk" end="gpio1_upper.clk" />
+ <connection kind="reset" version="21.1" start="clk_0.clk_reset" end="gpio1_i2c.reset" />
  <connection kind="reset" version="21.1" start="clk_0.clk_reset" end="gpio1_upper.reset" />
  <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
  <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
