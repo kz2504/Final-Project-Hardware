@@ -27,8 +27,8 @@ module imgproc(
    output logic        xclk
 );
 
-   localparam int FRAME_WIDTH      = 320;
-   localparam int FRAME_HEIGHT     = 240;
+   localparam int FRAME_WIDTH      = 640;
+   localparam int FRAME_HEIGHT     = 480;
    localparam int FRAME_PIXELS     = FRAME_WIDTH * FRAME_HEIGHT;
    localparam int FRAME_WORDS      = FRAME_PIXELS / 4;
    localparam int FRAME_WORD_BITS  = $clog2(FRAME_WORDS);
