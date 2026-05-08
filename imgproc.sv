@@ -1,10 +1,20 @@
 /*
+ * Top-level image processing peripheral.
+ *
  * Register map, word addressed:
  *
  * Address  Register  Access  Meaning
- *   0      CONTROL   R/W     bit 0: DONE. Hardware sets; write 0 to clear.
- *   1      INDEX     R/W     Frame word index, 0 .. 19199.
- *   2      DATA      R       Four pixels packed as {p3, p2, p1, p0}.
+ *   0      AREA_A    R       Camera A foreground area
+ *   1      U_A       R       Camera A foreground u/x moment sum
+ *   2      V_A       R       Camera A foreground v/y moment sum
+ *   3      AREA_B    R       Camera B foreground area
+ *   4      U_B       R       Camera B foreground u/x moment sum
+ *   5      V_B       R       Camera B foreground v/y moment sum
+ *   6      DONE      R/W     bit 0: A, bit 1: B, bit 2: frame buffer
+ *   7      CONTROL   R/W     [1:0] frame source: 0 none, 1 A, 2 B
+ *                            [15:8] threshold A, [23:16] threshold B
+ *   8      FB_INDEX  R/W     Frame buffer word index, 0 .. 76799
+ *   9      FB_DATA   R       Four pixels packed as {p3, p2, p1, p0}
  */
 
 module imgproc(
@@ -14,98 +24,149 @@ module imgproc(
    input  logic [31:0] writedata,
    input  logic        write,
    input  logic        chipselect,
-   input  logic [1:0]  address,
+   input  logic [3:0]  address,
 
    output logic [31:0] readdata,
 
-   input  logic        pclk,
-   input  logic        href,
-   input  logic        vsync,
-   input  logic [7:0]  data,
+   input  logic        a_pclk,
+   input  logic        a_href,
+   input  logic        a_vsync,
+   input  logic [7:0]  a_data,
+   output logic        a_xclk,
 
-   output logic [9:0]  leds,
-   output logic        xclk
+   input  logic        b_pclk,
+   input  logic        b_href,
+   input  logic        b_vsync,
+   input  logic [7:0]  b_data,
+   output logic        b_xclk,
+
+   output logic [9:0]  leds
 );
 
-   localparam int FRAME_WIDTH      = 640;
-   localparam int FRAME_HEIGHT     = 480;
-   localparam int FRAME_PIXELS     = FRAME_WIDTH * FRAME_HEIGHT;
-   localparam int FRAME_WORDS      = FRAME_PIXELS / 4;
-   localparam int FRAME_WORD_BITS  = $clog2(FRAME_WORDS);
-   localparam int FRAME_PIXEL_BITS = $clog2(FRAME_PIXELS);
-   localparam logic [FRAME_PIXEL_BITS-1:0] LAST_FRAME_PIXEL =
-      FRAME_PIXEL_BITS'(FRAME_PIXELS - 1);
+   localparam int FRAME_WIDTH  = 640;
+   localparam int FRAME_HEIGHT = 480;
 
-   localparam logic [1:0] REG_CONTROL = 2'd0;
-   localparam logic [1:0] REG_INDEX   = 2'd1;
-   localparam logic [1:0] REG_DATA    = 2'd2;
+   typedef enum logic [3:0] {
+      REG_AREA_A   = 4'd0,
+      REG_U_A      = 4'd1,
+      REG_V_A      = 4'd2,
+      REG_AREA_B   = 4'd3,
+      REG_U_B      = 4'd4,
+      REG_V_B      = 4'd5,
+      REG_DONE     = 4'd6,
+      REG_CONTROL  = 4'd7,
+      REG_FB_INDEX = 4'd8,
+      REG_FB_DATA  = 4'd9
+   } register_address_t;
 
    typedef enum logic [1:0] {
-      STATE_WAIT_FRAME,
-      STATE_CAPTURE,
-      STATE_DONE
-   } capture_state_t;
-
-   logic [31:0] frame_index;
-   logic        frame_index_valid;
-   logic        write_index_valid;
-   logic [FRAME_WORD_BITS-1:0] frame_rd_addr;
-   logic [FRAME_WORD_BITS-1:0] write_index_addr;
-   logic [FRAME_WORD_BITS-1:0] frame_ram_rd_addr;
-   logic [31:0] frame_ram_rd_data;
-   logic [31:0] frame_ram_wr_data;
-   logic        frame_ram_wren;
-
-   (* ramstyle = "M10K" *) logic [31:0] frame_ram [0:FRAME_WORDS-1];
+      STORE_NONE = 2'd0,
+      STORE_A    = 2'd1,
+      STORE_B    = 2'd2
+   } frame_store_select_t;
 
    logic        clk25;
-   logic        done_meta;
-   logic        done_clk;
-   logic        clear_req_toggle;
+   logic [31:0] control;
+   logic [31:0] frame_index;
+   frame_store_select_t frame_store_select;
 
-   logic [2:0]  clear_req_sync;
-   logic        clear_req_seen;
-   logic        done_pclk;
-   capture_state_t capture_state;
-   logic        vsync_d;
-   logic [1:0]  yuv_byte_phase;
-   logic [1:0]  pixel_pack_phase;
-   logic [23:0] pixel_pack_word;
-   logic [FRAME_WORD_BITS-1:0]  frame_wr_addr;
-   logic [FRAME_PIXEL_BITS-1:0] captured_pixels;
+   logic        a_clear_toggle;
+   logic        b_clear_toggle;
+   logic        frame_clear_toggle;
 
-   assign frame_index_valid = frame_index < FRAME_WORDS;
-   assign frame_rd_addr = frame_index_valid ? frame_index[FRAME_WORD_BITS-1:0] : '0;
-   assign write_index_valid = writedata < FRAME_WORDS;
-   assign write_index_addr = write_index_valid ? writedata[FRAME_WORD_BITS-1:0] : '0;
-   assign frame_ram_rd_addr =
-      (chipselect && write && address == REG_INDEX) ? write_index_addr : frame_rd_addr;
-   assign frame_ram_wr_data = { data, pixel_pack_word };
-   assign frame_ram_wren =
-      capture_state == STATE_CAPTURE && !vsync && href &&
-      !yuv_byte_phase[0] && pixel_pack_phase == 2'd3;
+   logic [31:0] a_area;
+   logic [31:0] a_u_sum;
+   logic [31:0] a_v_sum;
+   logic        a_done;
+   logic        a_active;
+
+   logic [31:0] b_area;
+   logic [31:0] b_u_sum;
+   logic [31:0] b_v_sum;
+   logic        b_done;
+   logic        b_active;
+
+   logic        frame_index_write;
+   logic [31:0] frame_data;
+   logic        frame_done;
+   logic        frame_active;
+
+   logic        selected_pclk;
+   logic        selected_href;
+   logic        selected_vsync;
+   logic [7:0]  selected_data;
+   logic        frame_store_enable;
+   register_address_t register_address;
+
+   assign register_address = register_address_t'(address);
+   assign frame_index_write = chipselect && write && register_address == REG_FB_INDEX;
+   assign frame_store_enable = frame_store_select != STORE_NONE;
+
+   function automatic frame_store_select_t decode_frame_store(input logic [1:0] value);
+      case (value)
+         STORE_A: decode_frame_store = STORE_A;
+         STORE_B: decode_frame_store = STORE_B;
+         default: decode_frame_store = STORE_NONE;
+      endcase
+   endfunction
+
+   always_comb begin
+      case (frame_store_select)
+         STORE_A: begin
+            selected_pclk  = a_pclk;
+            selected_href  = a_href;
+            selected_vsync = a_vsync;
+            selected_data  = a_data;
+         end
+
+         STORE_B: begin
+            selected_pclk  = b_pclk;
+            selected_href  = b_href;
+            selected_vsync = b_vsync;
+            selected_data  = b_data;
+         end
+
+         default: begin
+            selected_pclk  = a_pclk;
+            selected_href  = a_href;
+            selected_vsync = a_vsync;
+            selected_data  = a_data;
+         end
+      endcase
+   end
 
    always_ff @(posedge clk or posedge reset) begin
       if (reset) begin
-         clk25            <= 1'b0;
-         frame_index      <= 32'd0;
-         done_meta        <= 1'b0;
-         done_clk         <= 1'b0;
-         clear_req_toggle <= 1'b0;
+         clk25              <= 1'b0;
+         control            <= 32'd0;
+         frame_index        <= 32'd0;
+         frame_store_select <= STORE_NONE;
+         a_clear_toggle     <= 1'b0;
+         b_clear_toggle     <= 1'b0;
+         frame_clear_toggle <= 1'b0;
       end else begin
-         clk25         <= ~clk25;
-         done_meta     <= done_pclk;
-         done_clk      <= done_meta;
+         clk25 <= ~clk25;
 
          if (chipselect && write) begin
-            unique case (address)
+            case (register_address)
                REG_CONTROL: begin
+                  control <= writedata;
+               end
+
+               REG_DONE: begin
                   if (!writedata[0]) begin
-                     clear_req_toggle <= ~clear_req_toggle;
+                     a_clear_toggle <= ~a_clear_toggle;
+                  end
+                  if (!writedata[1]) begin
+                     b_clear_toggle <= ~b_clear_toggle;
+                  end
+                  if (!writedata[2]) begin
+                     frame_store_select <= decode_frame_store(control[1:0]);
+                     frame_clear_toggle <= ~frame_clear_toggle;
                   end
                end
 
-               REG_INDEX: begin
+               REG_FB_INDEX: begin
                   frame_index <= writedata;
                end
 
@@ -116,105 +177,92 @@ module imgproc(
       end
    end
 
-   always_ff @(posedge clk) begin
-      frame_ram_rd_data <= frame_ram[frame_ram_rd_addr];
-   end
+   camera_moment_pipeline #(
+      .FRAME_WIDTH(FRAME_WIDTH),
+      .FRAME_HEIGHT(FRAME_HEIGHT)
+   ) camera_a_moments (
+      .clk              ( clk ),
+      .reset            ( reset ),
+      .clear_req_toggle ( a_clear_toggle ),
+      .threshold_cfg    ( control[15:8] ),
+      .pclk             ( a_pclk ),
+      .href             ( a_href ),
+      .vsync            ( a_vsync ),
+      .data             ( a_data ),
+      .area_result      ( a_area ),
+      .u_result         ( a_u_sum ),
+      .v_result         ( a_v_sum ),
+      .done             ( a_done ),
+      .active           ( a_active )
+   );
 
-   always_ff @(posedge pclk or posedge reset) begin
-      if (reset) begin
-         clear_req_sync   <= 3'b000;
-         capture_state    <= STATE_WAIT_FRAME;
-         vsync_d          <= 1'b0;
-         yuv_byte_phase   <= 2'd0;
-         pixel_pack_phase <= 2'd0;
-         pixel_pack_word  <= 24'd0;
-         frame_wr_addr    <= '0;
-         captured_pixels  <= '0;
-      end else begin
-         clear_req_sync <= { clear_req_sync[1:0], clear_req_toggle };
-         vsync_d        <= vsync;
+   camera_moment_pipeline #(
+      .FRAME_WIDTH(FRAME_WIDTH),
+      .FRAME_HEIGHT(FRAME_HEIGHT)
+   ) camera_b_moments (
+      .clk              ( clk ),
+      .reset            ( reset ),
+      .clear_req_toggle ( b_clear_toggle ),
+      .threshold_cfg    ( control[23:16] ),
+      .pclk             ( b_pclk ),
+      .href             ( b_href ),
+      .vsync            ( b_vsync ),
+      .data             ( b_data ),
+      .area_result      ( b_area ),
+      .u_result         ( b_u_sum ),
+      .v_result         ( b_v_sum ),
+      .done             ( b_done ),
+      .active           ( b_active )
+   );
 
-         if (clear_req_seen) begin
-            capture_state    <= STATE_WAIT_FRAME;
-            yuv_byte_phase   <= 2'd0;
-            pixel_pack_phase <= 2'd0;
-            pixel_pack_word  <= 24'd0;
-            frame_wr_addr    <= '0;
-            captured_pixels  <= '0;
-         end else begin
-            unique case (capture_state)
-               STATE_WAIT_FRAME: begin
-                  yuv_byte_phase <= 2'd0;
-
-                  if (vsync_d && !vsync) begin
-                     capture_state    <= STATE_CAPTURE;
-                     pixel_pack_phase <= 2'd0;
-                     pixel_pack_word  <= 24'd0;
-                     frame_wr_addr    <= '0;
-                     captured_pixels  <= '0;
-                  end
-               end
-
-               STATE_CAPTURE: begin
-                  if (vsync) begin
-                     capture_state  <= STATE_WAIT_FRAME;
-                     yuv_byte_phase <= 2'd0;
-                  end else if (href) begin
-                     yuv_byte_phase <= yuv_byte_phase + 2'd1;
-
-                     if (!yuv_byte_phase[0]) begin
-                        unique case (pixel_pack_phase)
-                           2'd0: pixel_pack_word[7:0]   <= data;
-                           2'd1: pixel_pack_word[15:8]  <= data;
-                           2'd2: pixel_pack_word[23:16] <= data;
-                           default: begin
-                              frame_wr_addr <= frame_wr_addr + 1'b1;
-                           end
-                        endcase
-
-                        pixel_pack_phase <= pixel_pack_phase + 2'd1;
-
-                        if (captured_pixels == LAST_FRAME_PIXEL) begin
-                           capture_state <= STATE_DONE;
-                        end else begin
-                           captured_pixels <= captured_pixels + 1'b1;
-                        end
-                     end
-                  end else begin
-                     yuv_byte_phase <= 2'd0;
-                  end
-               end
-
-               STATE_DONE: begin
-               end
-
-               default: begin
-                  capture_state <= STATE_WAIT_FRAME;
-               end
-            endcase
-         end
-      end
-   end
-
-   always_ff @(posedge pclk) begin
-      if (frame_ram_wren) begin
-         frame_ram[frame_wr_addr] <= frame_ram_wr_data;
-      end
-   end
-
-   assign clear_req_seen = clear_req_sync[2] ^ clear_req_sync[1];
-   assign done_pclk = capture_state == STATE_DONE;
+   frame_buffer #(
+      .FRAME_WIDTH(FRAME_WIDTH),
+      .FRAME_HEIGHT(FRAME_HEIGHT)
+   ) debug_frame_buffer (
+      .clk              ( clk ),
+      .reset            ( reset ),
+      .clear_req_toggle ( frame_clear_toggle ),
+      .enable           ( frame_store_enable ),
+      .pclk             ( selected_pclk ),
+      .href             ( selected_href ),
+      .vsync            ( selected_vsync ),
+      .data             ( selected_data ),
+      .index_write      ( frame_index_write ),
+      .index_writedata  ( writedata ),
+      .frame_index      ( frame_index ),
+      .frame_data       ( frame_data ),
+      .done             ( frame_done ),
+      .active           ( frame_active )
+   );
 
    always_comb begin
-      unique case (address)
-         REG_CONTROL: readdata = { 31'd0, done_clk };
-         REG_INDEX:   readdata = frame_index;
-         REG_DATA:    readdata = frame_index_valid ? frame_ram_rd_data : 32'd0;
-         default:     readdata = 32'd0;
+      case (register_address)
+         REG_AREA_A:   readdata = a_area;
+         REG_U_A:      readdata = a_u_sum;
+         REG_V_A:      readdata = a_v_sum;
+         REG_AREA_B:   readdata = b_area;
+         REG_U_B:      readdata = b_u_sum;
+         REG_V_B:      readdata = b_v_sum;
+         REG_DONE:     readdata = { 29'd0, frame_done, b_done, a_done };
+         REG_CONTROL:  readdata = control;
+         REG_FB_INDEX: readdata = frame_index;
+         REG_FB_DATA:  readdata = frame_data;
+         default:      readdata = 32'd0;
       endcase
    end
 
-   assign leds = { 8'd0, capture_state == STATE_CAPTURE, done_clk };
-   assign xclk = clk25;
+   assign a_xclk = clk25;
+   assign b_xclk = clk25;
+   assign leds = {
+      1'b0,
+      !reset,
+      frame_store_select,
+      frame_active,
+      b_active,
+      a_active,
+      frame_done,
+      b_done,
+      a_done
+   };
 
 endmodule

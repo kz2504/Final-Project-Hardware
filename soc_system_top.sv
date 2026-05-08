@@ -183,7 +183,10 @@ module soc_system_top(
      .reset_reset_n                ( KEY[0] ),
 
      .gpio1_i2c_export             ( GPIO_1[25:22] ),
-     .gpio1_upper_export           ( GPIO_1[35:28] ),
+     .gpio1_upper_export           ( { GPIO_1[27], GPIO_1[35:28] } ),
+     .gpio0_i2c_export             ( GPIO_0[25:22] ),
+     .gpio0_upper_export           ( { GPIO_0[27], GPIO_0[35:28] } ),
+     // temp
                           
      .hps_ddr3_mem_a               ( HPS_DDR3_ADDR ),
      .hps_ddr3_mem_ba              ( HPS_DDR3_BA ),
@@ -285,10 +288,15 @@ module soc_system_top(
    assign FPGA_I2C_SCLK = SW[0];
    assign FPGA_I2C_SDAT = SW[1] ? SW[0] : 1'bZ;
 
+   // temp
+   assign GPIO_0[21:0] = {22{1'bZ}};
+   assign GPIO_0[26] = 1'bZ;
+
    assign GPIO_1[21:0] = {22{1'bZ}};
    assign GPIO_1[26] = 1'bZ;
-   assign GPIO_1[27] = 1'bZ;
+
    assign LEDR = 10'h000;
+   // temp
 
    assign HEX0 = { 7{ SW[1] } };
    assign HEX1 = { 7{ SW[2] } };

@@ -48,7 +48,11 @@ TARFILES = Makefile \
 	$(SRF) \
 	ip/intr_capturer/intr_capturer.v \
 	ip/intr_capturer/intr_capturer_hw.tcl \
-	imgproc.sv
+	imgproc.sv \
+	camera_moment_pipeline.sv \
+	pixel_coordinate_decoder.sv \
+	moment_accumulators.sv \
+	frame_buffer.sv
 
 TARFILE = lab3-hw.tar.gz
 
