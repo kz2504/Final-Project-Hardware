@@ -47,6 +47,7 @@ module frame_buffer #(
    logic        clear_req_seen;
    logic        done_pclk;
    logic        done_sync;
+   logic        enable_sync;
    capture_state_t capture_state;
    logic        vsync_d;
    logic [1:0]  yuv_byte_phase;
@@ -62,7 +63,7 @@ module frame_buffer #(
    assign frame_ram_rd_addr = index_write ? write_index_addr : frame_rd_addr;
    assign frame_ram_wr_data = { data, pixel_pack_word };
    assign frame_ram_wren =
-      enable && capture_state == STATE_CAPTURE && !vsync && href &&
+      enable_sync && capture_state == STATE_CAPTURE && !vsync && href &&
       !yuv_byte_phase[0] && pixel_pack_phase == 2'd3;
 
    always_ff @(posedge clk or posedge reset) begin
@@ -82,6 +83,7 @@ module frame_buffer #(
    always_ff @(posedge pclk or posedge reset) begin
       if (reset) begin
          clear_req_sync   <= 3'b000;
+         enable_sync      <= 1'b0;
          capture_state    <= STATE_WAIT_FRAME;
          vsync_d          <= 1'b0;
          yuv_byte_phase   <= 2'd0;
@@ -94,6 +96,7 @@ module frame_buffer #(
          vsync_d        <= vsync;
 
          if (clear_req_seen) begin
+            enable_sync      <= enable;
             capture_state    <= STATE_WAIT_FRAME;
             yuv_byte_phase   <= 2'd0;
             pixel_pack_phase <= 2'd0;
@@ -105,7 +108,7 @@ module frame_buffer #(
                STATE_WAIT_FRAME: begin
                   yuv_byte_phase <= 2'd0;
 
-                  if (enable && vsync_d && !vsync) begin
+                  if (enable_sync && vsync_d && !vsync) begin
                      capture_state    <= STATE_CAPTURE;
                      pixel_pack_phase <= 2'd0;
                      pixel_pack_word  <= 24'd0;

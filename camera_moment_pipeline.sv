@@ -21,6 +21,8 @@ module camera_moment_pipeline #(
 
    logic [2:0] clear_req_sync;
    logic       clear_seen;
+   logic       clear_req_toggle_sync_d;
+   logic [7:0] threshold_sync;
    logic [7:0] threshold_active;
 
    logic       pixel_valid;
@@ -39,6 +41,18 @@ module camera_moment_pipeline #(
 
    assign clear_seen = clear_req_sync[2] ^ clear_req_sync[1];
 
+   always_ff @(posedge clk or posedge reset) begin
+      if (reset) begin
+         clear_req_toggle_sync_d <= 1'b0;
+         threshold_sync          <= 8'd0;
+      end else begin
+         clear_req_toggle_sync_d <= clear_req_toggle;
+         if (clear_req_toggle_sync_d != clear_req_toggle) begin
+            threshold_sync <= threshold_cfg;
+         end
+      end
+   end
+
    always_ff @(posedge pclk or posedge reset) begin
       if (reset) begin
          clear_req_sync   <= 3'b000;
@@ -46,7 +60,7 @@ module camera_moment_pipeline #(
       end else begin
          clear_req_sync <= { clear_req_sync[1:0], clear_req_toggle };
          if (clear_seen) begin
-            threshold_active <= threshold_cfg;
+            threshold_active <= threshold_sync;
          end
       end
    end

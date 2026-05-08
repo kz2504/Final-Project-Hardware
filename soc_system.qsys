@@ -668,7 +668,7 @@
    start="hps_0.h2f_lw_axi_master"
    end="gpio1_i2c.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00000040" />
+  <parameter name="baseAddress" value="0x00000160" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -677,7 +677,7 @@
    start="hps_0.h2f_lw_axi_master"
    end="gpio1_upper.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00000020" />
+  <parameter name="baseAddress" value="0x00000140" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -686,7 +686,7 @@
    start="hps_0.h2f_lw_axi_master"
    end="gpio0_i2c.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00000080" />
+  <parameter name="baseAddress" value="0x00000120" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
@@ -695,7 +695,7 @@
    start="hps_0.h2f_lw_axi_master"
    end="gpio0_upper.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00000060" />
+  <parameter name="baseAddress" value="0x00000100" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
