@@ -23,12 +23,14 @@ module camera_moment_pipeline #(
    logic       clear_seen;
    logic       clear_req_toggle_sync_d;
    logic [7:0] threshold_sync;
+   logic       threshold_update_sync;
    logic [7:0] threshold_active;
 
    logic       pixel_valid;
    logic [7:0] pixel_data;
    logic [9:0] u_coord;
    logic [8:0] v_coord;
+   logic       frame_start_pulse;
    logic       frame_done_pulse;
    logic       foreground;
 
@@ -56,11 +58,18 @@ module camera_moment_pipeline #(
    always_ff @(posedge pclk or posedge reset) begin
       if (reset) begin
          clear_req_sync   <= 3'b000;
+         threshold_update_sync <= 1'b0;
          threshold_active <= 8'd0;
       end else begin
          clear_req_sync <= { clear_req_sync[1:0], clear_req_toggle };
          if (clear_seen) begin
-            threshold_active <= threshold_sync;
+            threshold_update_sync <= 1'b1;
+         end
+         if (frame_start_pulse) begin
+            if (threshold_update_sync || clear_seen) begin
+               threshold_active <= threshold_sync;
+               threshold_update_sync <= 1'b0;
+            end
          end
       end
    end
@@ -71,7 +80,6 @@ module camera_moment_pipeline #(
    ) coordinate_decoder (
       .pclk          ( pclk ),
       .reset         ( reset ),
-      .clear         ( clear_seen ),
       .href          ( href ),
       .vsync         ( vsync ),
       .data          ( data ),
@@ -79,6 +87,7 @@ module camera_moment_pipeline #(
       .pixel_data    ( pixel_data ),
       .u_coord       ( u_coord ),
       .v_coord       ( v_coord ),
+      .frame_start   ( frame_start_pulse ),
       .frame_done    ( frame_done_pulse ),
       .active        ( active )
    );
@@ -93,6 +102,7 @@ module camera_moment_pipeline #(
       .foreground       ( foreground ),
       .u_coord          ( u_coord ),
       .v_coord          ( v_coord ),
+      .frame_start      ( frame_start_pulse ),
       .frame_done       ( frame_done_pulse ),
       .area_result_pclk ( area_result_pclk ),
       .u_result_pclk    ( u_result_pclk ),
