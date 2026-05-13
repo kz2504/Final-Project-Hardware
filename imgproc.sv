@@ -18,88 +18,88 @@
  */
 
 module imgproc(
-   input  logic        clk,
-   input  logic        reset,
+   input logic clk,
+   input logic reset,
 
-   input  logic [31:0] writedata,
-   input  logic        write,
-   input  logic        chipselect,
-   input  logic [3:0]  address,
+   input logic [31:0] writedata,
+   input logic write,
+   input logic chipselect,
+   input logic [3:0] address,
 
    output logic [31:0] readdata,
 
-   input  logic        a_pclk,
-   input  logic        a_href,
-   input  logic        a_vsync,
-   input  logic [7:0]  a_data,
-   output logic        a_xclk,
+   input logic a_pclk,
+   input logic a_href,
+   input logic a_vsync,
+   input logic [7:0] a_data,
+   output logic a_xclk,
 
-   input  logic        b_pclk,
-   input  logic        b_href,
-   input  logic        b_vsync,
-   input  logic [7:0]  b_data,
-   output logic        b_xclk,
+   input logic b_pclk,
+   input logic b_href,
+   input logic b_vsync,
+   input logic [7:0] b_data,
+   output logic b_xclk,
 
-   output logic [9:0]  leds
+   output logic [9:0] leds
 );
 
-   localparam int FRAME_WIDTH  = 640;
+   localparam int FRAME_WIDTH = 640;
    localparam int FRAME_HEIGHT = 480;
 
    typedef enum logic [3:0] {
-      REG_AREA_A   = 4'd0,
-      REG_U_A      = 4'd1,
-      REG_V_A      = 4'd2,
-      REG_AREA_B   = 4'd3,
-      REG_U_B      = 4'd4,
-      REG_V_B      = 4'd5,
-      REG_DONE     = 4'd6,
-      REG_CONTROL  = 4'd7,
+      REG_AREA_A = 4'd0,
+      REG_U_A = 4'd1,
+      REG_V_A = 4'd2,
+      REG_AREA_B = 4'd3,
+      REG_U_B = 4'd4,
+      REG_V_B = 4'd5,
+      REG_DONE = 4'd6,
+      REG_CONTROL = 4'd7,
       REG_FB_INDEX = 4'd8,
-      REG_FB_DATA  = 4'd9
-   } register_address_t;
+      REG_FB_DATA = 4'd9
+   } register_address_t; 
 
    typedef enum logic [1:0] {
       STORE_NONE = 2'd0,
-      STORE_A    = 2'd1,
-      STORE_B    = 2'd2
+      STORE_A = 2'd1,
+      STORE_B = 2'd2
    } frame_store_select_t;
 
-   logic        clk25;
+   logic clk25;
    logic [31:0] control;
    logic [31:0] frame_index;
    frame_store_select_t frame_store_select;
 
-   logic        a_clear_toggle;
-   logic        b_clear_toggle;
-   logic        frame_clear_toggle;
+   logic a_clear_toggle;
+   logic b_clear_toggle;
+   logic frame_clear_toggle;
 
    logic [31:0] a_area;
    logic [31:0] a_u_sum;
    logic [31:0] a_v_sum;
-   logic        a_done;
-   logic        a_active;
+   logic a_done;
+   logic a_active;
 
    logic [31:0] b_area;
    logic [31:0] b_u_sum;
    logic [31:0] b_v_sum;
-   logic        b_done;
-   logic        b_active;
+   logic b_done;
+   logic b_active;
 
-   logic        frame_index_write;
+   logic frame_index_write;
    logic [31:0] frame_data;
-   logic        frame_done;
-   logic        frame_active;
+   logic frame_done;
+   logic frame_active;
 
-   logic        selected_pclk;
-   logic        selected_href;
-   logic        selected_vsync;
-   logic [7:0]  selected_data;
-   logic        frame_store_enable;
+   logic selected_pclk;
+   logic selected_href;
+   logic selected_vsync;
+   logic [7:0] selected_data;
+   logic frame_store_enable;
    register_address_t register_address;
 
    assign register_address = register_address_t'(address);
-   assign frame_index_write = chipselect && write && register_address == REG_FB_INDEX;
+   assign frame_index_write = chipselect && write && (register_address == REG_FB_INDEX); //Combinational RAM read index update flag to avoid one-cycle delay
    assign frame_store_enable = frame_store_select != STORE_NONE;
 
    function automatic frame_store_select_t decode_frame_store(input logic [1:0] value);
@@ -113,36 +113,36 @@ module imgproc(
    always_comb begin
       case (frame_store_select)
          STORE_A: begin
-            selected_pclk  = a_pclk;
-            selected_href  = a_href;
+            selected_pclk = a_pclk;
+            selected_href = a_href;
             selected_vsync = a_vsync;
-            selected_data  = a_data;
+            selected_data = a_data;
          end
 
          STORE_B: begin
-            selected_pclk  = b_pclk;
-            selected_href  = b_href;
+            selected_pclk = b_pclk;
+            selected_href = b_href;
             selected_vsync = b_vsync;
-            selected_data  = b_data;
+            selected_data = b_data;
          end
 
          default: begin
-            selected_pclk  = a_pclk;
-            selected_href  = a_href;
+            selected_pclk = a_pclk;
+            selected_href = a_href;
             selected_vsync = a_vsync;
-            selected_data  = a_data;
+            selected_data = a_data;
          end
       endcase
    end
 
    always_ff @(posedge clk or posedge reset) begin
       if (reset) begin
-         clk25              <= 1'b0;
-         control            <= 32'd0;
-         frame_index        <= 32'd0;
+         clk25 <= 1'b0;
+         control <= 32'd0;
+         frame_index <= 32'd0;
          frame_store_select <= STORE_NONE;
-         a_clear_toggle     <= 1'b0;
-         b_clear_toggle     <= 1'b0;
+         a_clear_toggle <= 1'b0;
+         b_clear_toggle <= 1'b0;
          frame_clear_toggle <= 1'b0;
       end else begin
          clk25 <= ~clk25;
@@ -155,7 +155,7 @@ module imgproc(
 
                REG_DONE: begin
                   if (!writedata[0]) begin
-                     a_clear_toggle <= ~a_clear_toggle;
+                     a_clear_toggle <= ~a_clear_toggle; //Generate toggle flags for done clear
                   end
                   if (!writedata[1]) begin
                      b_clear_toggle <= ~b_clear_toggle;
@@ -178,76 +178,76 @@ module imgproc(
    end
 
    camera_moment_pipeline #(
-      .FRAME_WIDTH(FRAME_WIDTH),
-      .FRAME_HEIGHT(FRAME_HEIGHT)
+      .FRAME_WIDTH ( FRAME_WIDTH ),
+      .FRAME_HEIGHT ( FRAME_HEIGHT )
    ) camera_a_moments (
-      .clk              ( clk ),
-      .reset            ( reset ),
+      .clk ( clk ),
+      .reset ( reset ),
       .clear_req_toggle ( a_clear_toggle ),
-      .threshold_cfg    ( control[15:8] ),
-      .pclk             ( a_pclk ),
-      .href             ( a_href ),
-      .vsync            ( a_vsync ),
-      .data             ( a_data ),
-      .area_result      ( a_area ),
-      .u_result         ( a_u_sum ),
-      .v_result         ( a_v_sum ),
-      .done             ( a_done ),
-      .active           ( a_active )
+      .threshold_cfg ( control[15:8] ),
+      .pclk ( a_pclk ),
+      .href ( a_href ),
+      .vsync ( a_vsync ),
+      .data ( a_data ),
+      .area_result ( a_area ),
+      .u_result ( a_u_sum ),
+      .v_result ( a_v_sum ),
+      .done ( a_done ),
+      .active ( a_active )
    );
 
    camera_moment_pipeline #(
-      .FRAME_WIDTH(FRAME_WIDTH),
-      .FRAME_HEIGHT(FRAME_HEIGHT)
+      .FRAME_WIDTH ( FRAME_WIDTH ),
+      .FRAME_HEIGHT ( FRAME_HEIGHT )
    ) camera_b_moments (
-      .clk              ( clk ),
-      .reset            ( reset ),
+      .clk ( clk ),
+      .reset ( reset ),
       .clear_req_toggle ( b_clear_toggle ),
-      .threshold_cfg    ( control[23:16] ),
-      .pclk             ( b_pclk ),
-      .href             ( b_href ),
-      .vsync            ( b_vsync ),
-      .data             ( b_data ),
-      .area_result      ( b_area ),
-      .u_result         ( b_u_sum ),
-      .v_result         ( b_v_sum ),
-      .done             ( b_done ),
-      .active           ( b_active )
+      .threshold_cfg ( control[23:16] ),
+      .pclk ( b_pclk ),
+      .href ( b_href ),
+      .vsync ( b_vsync ),
+      .data ( b_data ),
+      .area_result ( b_area ),
+      .u_result ( b_u_sum ),
+      .v_result ( b_v_sum ),
+      .done ( b_done ),
+      .active ( b_active )
    );
 
    frame_buffer #(
-      .FRAME_WIDTH(FRAME_WIDTH),
-      .FRAME_HEIGHT(FRAME_HEIGHT)
+      .FRAME_WIDTH ( FRAME_WIDTH ),
+      .FRAME_HEIGHT ( FRAME_HEIGHT )
    ) debug_frame_buffer (
-      .clk              ( clk ),
-      .reset            ( reset ),
+      .clk ( clk ),
+      .reset ( reset ),
       .clear_req_toggle ( frame_clear_toggle ),
-      .enable           ( frame_store_enable ),
-      .pclk             ( selected_pclk ),
-      .href             ( selected_href ),
-      .vsync            ( selected_vsync ),
-      .data             ( selected_data ),
-      .index_write      ( frame_index_write ),
-      .index_writedata  ( writedata ),
-      .frame_index      ( frame_index ),
-      .frame_data       ( frame_data ),
-      .done             ( frame_done ),
-      .active           ( frame_active )
+      .enable ( frame_store_enable ),
+      .pclk ( selected_pclk ),
+      .href ( selected_href ),
+      .vsync ( selected_vsync ),
+      .data ( selected_data ),
+      .index_write ( frame_index_write ),
+      .index_writedata ( writedata ),
+      .frame_index ( frame_index ),
+      .frame_data ( frame_data ),
+      .done ( frame_done ),
+      .active ( frame_active )
    );
 
    always_comb begin
       case (register_address)
-         REG_AREA_A:   readdata = a_area;
-         REG_U_A:      readdata = a_u_sum;
-         REG_V_A:      readdata = a_v_sum;
-         REG_AREA_B:   readdata = b_area;
-         REG_U_B:      readdata = b_u_sum;
-         REG_V_B:      readdata = b_v_sum;
-         REG_DONE:     readdata = { 29'd0, frame_done, b_done, a_done };
-         REG_CONTROL:  readdata = control;
+         REG_AREA_A: readdata = a_area;
+         REG_U_A: readdata = a_u_sum;
+         REG_V_A: readdata = a_v_sum;
+         REG_AREA_B: readdata = b_area;
+         REG_U_B: readdata = b_u_sum;
+         REG_V_B: readdata = b_v_sum;
+         REG_DONE: readdata = { 29'd0, frame_done, b_done, a_done };
+         REG_CONTROL: readdata = control;
          REG_FB_INDEX: readdata = frame_index;
-         REG_FB_DATA:  readdata = frame_data;
-         default:      readdata = 32'd0;
+         REG_FB_DATA: readdata = frame_data;
+         default: readdata = 32'd0;
       endcase
    end
 

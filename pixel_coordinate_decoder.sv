@@ -1,20 +1,20 @@
 module pixel_coordinate_decoder #(
-   parameter int FRAME_WIDTH  = 640,
+   parameter int FRAME_WIDTH = 640,
    parameter int FRAME_HEIGHT = 480
 ) (
-   input  logic       pclk,
-   input  logic       reset,
-   input  logic       href,
-   input  logic       vsync,
-   input  logic [7:0] data,
+   input logic pclk,
+   input logic reset,
+   input logic href,
+   input logic vsync,
+   input logic [7:0] data,
 
-   output logic       pixel_valid,
+   output logic pixel_valid, //Pixel is Y
    output logic [7:0] pixel_data,
    output logic [9:0] u_coord,
    output logic [8:0] v_coord,
-   output logic       frame_start,
-   output logic       frame_done,
-   output logic       active
+   output logic frame_start, //One-cycle start pulse
+   output logic frame_done, //One-cycle done pulse
+   output logic active
 );
 
    localparam int FRAME_PIXELS = FRAME_WIDTH * FRAME_HEIGHT;
@@ -30,66 +30,66 @@ module pixel_coordinate_decoder #(
    } capture_state_t;
 
    capture_state_t capture_state;
-   logic       vsync_d;
+   logic vsync_d; //Delayed vsync for falling edge detection
    logic [1:0] yuv_byte_phase;
    logic [9:0] u_count;
    logic [8:0] v_count;
    logic [FRAME_PIXEL_BITS-1:0] pixel_count;
-   logic       current_is_y;
+   logic current_is_y;
 
-   assign current_is_y = capture_state == STATE_CAPTURE && href && !yuv_byte_phase[0];
+   assign current_is_y = (capture_state == STATE_CAPTURE) && href && !yuv_byte_phase[0]; //YUYV unpacking
 
    always_ff @(posedge pclk or posedge reset) begin
       if (reset) begin
-         capture_state  <= STATE_WAIT_FRAME;
-         vsync_d        <= 1'b0;
+         capture_state <= STATE_WAIT_FRAME;
+         vsync_d <= 1'b0;
          yuv_byte_phase <= 2'd0;
-         u_count        <= 10'd0;
-         v_count        <= 9'd0;
-         pixel_count    <= '0;
-         pixel_valid    <= 1'b0;
-         pixel_data     <= 8'd0;
-         u_coord        <= 10'd0;
-         v_coord        <= 9'd0;
-         frame_start    <= 1'b0;
-         frame_done     <= 1'b0;
-      end else begin
-         vsync_d     <= vsync;
-         pixel_valid <= current_is_y;
-         pixel_data  <= data;
-         u_coord     <= u_count;
-         v_coord     <= v_count;
+         u_count <= 10'd0;
+         v_count <= 9'd0;
+         pixel_count <= '0;
+         pixel_valid <= 1'b0;
+         pixel_data <= 8'd0;
+         u_coord <= 10'd0;
+         v_coord <= 9'd0;
          frame_start <= 1'b0;
-         frame_done  <= 1'b0;
+         frame_done <= 1'b0;
+      end else begin
+         vsync_d <= vsync;
+         pixel_valid <= current_is_y;
+         pixel_data <= data;
+         u_coord <= u_count;
+         v_coord <= v_count;
+         frame_start <= 1'b0;
+         frame_done <= 1'b0;
 
          case (capture_state)
             STATE_WAIT_FRAME: begin
                yuv_byte_phase <= 2'd0;
-               u_count        <= 10'd0;
-               v_count        <= 9'd0;
-               pixel_count    <= '0;
-               pixel_valid    <= 1'b0;
+               u_count <= 10'd0;
+               v_count <= 9'd0;
+               pixel_count <= '0;
+               pixel_valid <= 1'b0;
 
-               if (vsync_d && !vsync) begin
+               if (vsync_d && !vsync) begin //Start capture on falling edge
                   capture_state <= STATE_CAPTURE;
-                  frame_start   <= 1'b1;
+                  frame_start <= 1'b1;
                end
             end
 
             STATE_CAPTURE: begin
-               if (vsync) begin
-                  capture_state  <= STATE_WAIT_FRAME;
+               if (vsync) begin //Early vsync: go back to wait
+                  capture_state <= STATE_WAIT_FRAME;
                   yuv_byte_phase <= 2'd0;
-                  u_count        <= 10'd0;
-                  v_count        <= 9'd0;
-                  pixel_count    <= '0;
-                  pixel_valid    <= 1'b0;
+                  u_count <= 10'd0;
+                  v_count <= 9'd0;
+                  pixel_count <= '0;
+                  pixel_valid <= 1'b0;
                end else if (href) begin
                   yuv_byte_phase <= yuv_byte_phase + 2'd1;
 
                   if (current_is_y) begin
                      if (pixel_count == LAST_FRAME_PIXEL) begin
-                        frame_done    <= 1'b1;
+                        frame_done <= 1'b1;
                         capture_state <= STATE_WAIT_FRAME;
                      end else begin
                         pixel_count <= pixel_count + 1'b1;
