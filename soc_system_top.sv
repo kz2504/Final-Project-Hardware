@@ -260,7 +260,23 @@ module soc_system_top(
      .hps_hps_io_gpio_inst_GPIO48  ( HPS_I2C_CONTROL ),
      .hps_hps_io_gpio_inst_GPIO53  ( HPS_LED ),
      .hps_hps_io_gpio_inst_GPIO54  ( HPS_KEY ),
-     .hps_hps_io_gpio_inst_GPIO61  ( HPS_GSENSOR_INT )
+     .hps_hps_io_gpio_inst_GPIO61  ( HPS_GSENSOR_INT ),
+     
+     //Name conduits in platform designer: camera_a, camera_b, status
+     .camera_a_data (GPIO_0[7:0]),
+     .camera_a_href (GPIO_0[8]),
+     .camera_a_vsync (GPIO_0[9]),
+     .camera_a_pclk (GPIO_0[10]),
+     .camera_a_xclk (GPIO_0[26]),
+
+     .camera_b_data (GPIO_1[7:0]),
+     .camera_b_href (GPIO_1[8]),
+     .camera_b_vsync (GPIO_1[9]),
+     .camera_b_pclk (GPIO_1[10]),
+     .camera_b_xclk (GPIO_1[26]),
+
+     .status_leds (LEDR)
+
   );
 
    // The following quiet the "no driver" warnings for output
@@ -289,10 +305,6 @@ module soc_system_top(
 
    assign GPIO_0[21:0] = {22{1'bZ}};
    assign GPIO_1[21:0] = {22{1'bZ}};
-
-   assign GPIO_0[26] = 1'bZ; //Temp
-   assign GPIO_1[26] = 1'bZ; //Temp
-   assign LEDR = 10'h000; //Temp
 
    assign HEX0 = { 7{ SW[1] } };
    assign HEX1 = { 7{ SW[2] } };
